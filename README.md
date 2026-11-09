@@ -5,7 +5,7 @@ Ask Claude Code on your computer about the book you're reading in KOReader. By d
 <p align="center">
   <img src="docs/whos-who.png" width="360" alt="A “Who's who” answer from Ask Claude in KOReader">
   <br>
-  <sub>A repeat “Who's who” early in Chapter 1 of <i>The Picture of Dorian Gray</i>.</sub>
+  <sub>Asks information about “who is each chacter” early in Chapter 1 of <i>The Picture of Dorian Gray</i>.</sub>
 </p>
 
 ## Requirements
