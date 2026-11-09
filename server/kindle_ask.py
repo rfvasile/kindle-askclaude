@@ -705,6 +705,14 @@ def build_prompt(req, info, new_session, question):
     return "\n\n".join(parts)
 
 
+def conversation_summary(book_id, session_id):
+    """How a conversation began and how many answers it holds, for the Kindle's menu."""
+    entries = [e for e in read_history(book_id) if session_id and e.get("session_id") == session_id]
+    if not entries:
+        return None
+    return {"first": entries[0].get("question") or "", "answers": len(entries)}
+
+
 def saw_whole_book(book_id, session_id):
     """Whether a conversation was had while the book was marked "Spoilers OK"."""
     return any(e.get("session_id") == session_id and e.get("spoilers_ok")
@@ -714,7 +722,7 @@ def saw_whole_book(book_id, session_id):
 def handle_ask():
     """Request: {book_id, title, authors, chapter, percent, page_text, toc,
     selection, action, question, session_id, spoilers_ok}.
-    Reply: {ok, answer, session_id, actions}."""
+    Reply: {ok, answer, session_id, conversation: {first, answers}, actions}."""
     req = read_json_stdin()
     book_id = check_id(req.get("book_id"))
     spoilers_ok = req.get("spoilers_ok") is True
@@ -758,6 +766,7 @@ def handle_ask():
         f"{time.time() - started:.1f}s action={req.get('action')} q={question[:60]!r}")
     # The current menu rides along so the Kindle picks up added/removed modules.
     reply({"ok": True, "answer": answer, "session_id": out.get("session_id"),
+           "conversation": conversation_summary(book_id, out.get("session_id")),
            "actions": menu_actions(mods)})
 
 

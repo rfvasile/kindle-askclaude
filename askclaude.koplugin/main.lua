@@ -322,10 +322,23 @@ function AskClaude:lastSession(book_id)
     return sessions[book_id or self:bookId()]
 end
 
-function AskClaude:saveSession(book_id, session_id)
+-- Remembers the conversation "Continue" picks up, with what it holds
+-- (`info` = {first = its first question, answers = count}); nil forgets it.
+function AskClaude:saveSession(book_id, session_id, info)
     local sessions = self.settings:readSetting("sessions") or {}
     sessions[book_id] = session_id
     self:set("sessions", sessions)
+    local conversations = self.settings:readSetting("conversations") or {}
+    conversations[book_id] = (session_id and type(info) == "table" and str(info.first))
+        and { first = info.first, answers = tonumber(info.answers) or 1 } or nil
+    self:set("conversations", conversations)
+end
+
+function AskClaude:continueLabel(book_id)
+    local c = (self.settings:readSetting("conversations") or {})[book_id or self:bookId()]
+    if not c then return _("Continue last conversation…") end
+    local answers = c.answers == 1 and _("1 answer") or T(_("%1 answers"), c.answers)
+    return T(_("Continue: “%1” (%2)"), excerpt(c.first, 24), answers)
 end
 
 -- "Spoilers OK": Claude gets the whole book, and the no-spoilers rule is off.
@@ -394,7 +407,7 @@ function AskClaude:showMenu(selection)
     local last = self:lastSession()
     if last then
         table.insert(buttons, {{
-            text = _("Continue last conversation…"),
+            text = self:continueLabel(),
             callback = go(function() self:promptQuestion(selection, last, back) end),
         }})
     end
@@ -531,16 +544,39 @@ function AskClaude:showHistory(back)
     end)
 end
 
+-- Entries arrive newest first. They are grouped by conversation (newest
+-- conversation first), each in order with its follow-ups indented; ● marks
+-- the conversation "Continue" picks up.
 function AskClaude:renderHistory(book_id, entries, back)
     local function again() self:renderHistory(book_id, entries, back) end
-    local rows = {}
+    local last = self:lastSession(book_id)
+    local groups, by_session = {}, {}
     for _i, e in ipairs(entries) do
-        local where = str(e.where)
-        table.insert(rows, {
-            text = (where and where ~= "" and (excerpt(where, 28) .. " · ") or "")
-                .. excerpt(str(e.question) or "", 60),
-            callback = function() self:showHistoryEntry(book_id, e, again, back) end,
-        })
+        local key = str(e.session_id) or ("entry " .. tostring(e.id))
+        if not by_session[key] then
+            by_session[key] = { session_id = str(e.session_id), entries = {} }
+            table.insert(groups, by_session[key])
+        end
+        table.insert(by_session[key].entries, 1, e)
+    end
+    local rows = {}
+    for _i, group in ipairs(groups) do
+        local is_last = last ~= nil and group.session_id == last
+        for j, e in ipairs(group.entries) do
+            local where = str(e.where)
+            table.insert(rows, {
+                text = (is_last and "● " or "") .. (j > 1 and "   ↳ " or "")
+                    .. (where and where ~= "" and (excerpt(where, 28) .. " · ") or "")
+                    .. excerpt(str(e.question) or "", 60),
+                callback = function() self:showHistoryEntry(book_id, e, again, back) end,
+            })
+        end
+    end
+    if last then
+        -- Keep the Continue button's summary in step with deleted entries.
+        local group = by_session[last]
+        self:saveSession(book_id, last, group
+            and { first = str(group.entries[1].question) or "", answers = #group.entries })
     end
     table.insert(rows, {
         text = _("Clear this book's history…"),
@@ -609,9 +645,7 @@ function AskClaude:confirmClearHistory(book_id, to_list, back)
             self:withConnection(function()
                 local res, err = self:remote("history-clear " .. book_id, nil, _("Clearing…"))
                 if not res then return self:showError(err) end
-                local sessions = self.settings:readSetting("sessions") or {}
-                sessions[book_id] = nil
-                self:set("sessions", sessions)
+                self:saveSession(book_id, nil)
                 UIManager:show(InfoMessage:new{ text = _("History cleared."), timeout = 2 })
                 if back then UIManager:nextTick(back) end
             end)
@@ -833,7 +867,7 @@ function AskClaude:doAsk(opts)
     if not res then return self:showError(err) end
     if type(res.actions) == "table" then self:saveActions(res.actions) end
     local session_id = str(res.session_id)
-    if session_id then self:saveSession(ctx.book_id, session_id) end
+    if session_id then self:saveSession(ctx.book_id, session_id, res.conversation) end
     self:showAnswer(opts, str(res.answer) or "", session_id)
 end
 
@@ -915,15 +949,6 @@ function AskClaude:addToMainMenu(menu_items)
             {
                 text = _("Help modules"),
                 callback = function() self:showModules() end,
-            },
-            {
-                text = _("Start a new conversation for this book"),
-                callback = function()
-                    local sessions = self.settings:readSetting("sessions") or {}
-                    sessions[self:bookId()] = nil
-                    self:set("sessions", sessions)
-                    UIManager:show(InfoMessage:new{ text = _("The next question starts fresh."), timeout = 2 })
-                end,
             },
             {
                 text = _("Spoilers OK for this book"),
