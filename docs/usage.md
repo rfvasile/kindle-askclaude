@@ -15,6 +15,7 @@ Under an answer, **Follow up…** continues the same conversation. The first que
 
 Tools → Ask Claude also has:
 - **Start a new conversation for this book**
+- **Spoilers OK for this book:** Claude reads the whole book and the no-spoilers rule is off, for this book only. Useful for re-reads and non-fiction; switching starts a new conversation
 - **Refresh menu from computer**, after editing modules on the computer
 - **Re-send this book**, if the file changed
 - **Test connection**

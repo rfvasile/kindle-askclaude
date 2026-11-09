@@ -31,6 +31,10 @@ book_so_far.txt (the text cut at the end of the reader's current page),
 contents.txt (the chapters up to there) and history.md (earlier exchanges about
 this book from no later than the current position). Its tools are limited to
 Read/Grep/Glob, and reads outside that directory are denied.
+
+A book marked "Spoilers OK" on the Kindle also gets book_full.txt (the whole
+book) and its whole history, and modules with `skip_if_spoilers_ok: true` are
+left out of the system prompt.
 """
 
 import json
@@ -74,6 +78,13 @@ starts. It may be missing or approximate for some books.
 oldest first. It may be empty.
 
 Prefer several targeted Grep searches and short Reads to reading huge spans."""
+
+# Added when the reader has marked the book "Spoilers OK" on the Kindle.
+SPOILERS_OK_PROMPT = """\
+Spoilers are OK for this book: the reader has chosen to discuss anything in it, \
+including what happens after their position. book_full.txt holds the whole book, \
+one paragraph per line. book_so_far.txt still ends where the reader is, so use it \
+to tell what they have and haven't read yet."""
 
 
 def log(msg):
@@ -184,6 +195,7 @@ def parse_module_text(text, module_id):
         "scope": meta.get("scope", "any"),  # selection | page | any
         "order": order,
         "enabled": meta.get("enabled", "true").lower() not in ("false", "no", "off", "0"),
+        "skip_if_spoilers_ok": meta.get("skip_if_spoilers_ok", "false").lower() in ("true", "yes", "on", "1"),
         "guidance": guidance,
         "prompt": prompt,
         "kind": "action + guidance" if prompt and guidance else "action" if prompt else "guidance",
@@ -207,8 +219,11 @@ def load_modules(include_disabled=False):
     return sorted(mods, key=lambda m: (m["order"], m["id"]))
 
 
-def system_prompt(mods):
-    return "\n\n".join([CORE_PROMPT] + [m["guidance"] for m in mods if m["guidance"]])
+def system_prompt(mods, spoilers_ok=False):
+    parts = [CORE_PROMPT] + ([SPOILERS_OK_PROMPT] if spoilers_ok else [])
+    parts += [m["guidance"] for m in mods
+              if m["guidance"] and not (spoilers_ok and m["skip_if_spoilers_ok"])]
+    return "\n\n".join(parts)
 
 
 def menu_actions(mods=None):
@@ -617,13 +632,18 @@ def build_contents(so_far, toc, total_len):
     return out
 
 
-def prepare_workdir(book_id, req):
-    """Write the spoiler-free view of the book. Returns (workdir, info dict)."""
+def prepare_workdir(book_id, req, spoilers_ok=False):
+    """Write Claude's view of the book: spoiler-free unless spoilers_ok.
+
+    Returns (workdir, info dict).
+    """
     work = WORK / book_id
     work.mkdir(parents=True, exist_ok=True)
-    history = history_markdown(book_id, req.get("percent"))
+    full_copy = work / "book_full.txt"
+    full_copy.unlink(missing_ok=True)  # never left over from a "Spoilers OK" question
+    history = history_markdown(book_id, None if spoilers_ok else req.get("percent"))
     (work / "history.md").write_text("\n\n".join(history) + "\n" if history else "")
-    info = {"text": False, "lines": 0, "chapters": 0, "history": len(history)}
+    info = {"text": False, "lines": 0, "chapters": 0, "history": len(history), "full_lines": 0}
     full = BOOKS / book_id / "book.txt"
     if full.is_file():
         text = full.read_text(errors="replace")
@@ -634,6 +654,9 @@ def prepare_workdir(book_id, req):
         contents = build_contents(so_far, req.get("toc"), len(text))
         (work / "contents.txt").write_text("\n".join(contents) + "\n" if contents else "")
         info.update(text=True, lines=so_far.count("\n"), chapters=len(contents))
+        if spoilers_ok:
+            full_copy.write_text(text)
+            info["full_lines"] = text.count("\n")
     return work, info
 
 
@@ -668,7 +691,8 @@ def build_prompt(req, info, new_session, question):
         if not info["text"]:
             parts.append("(The book's text isn't available, so answer from the passage and general knowledge.)")
         else:
-            parts.append(f"(book_so_far.txt has {info['lines']} lines; contents.txt lists "
+            full = f"; book_full.txt has {info['full_lines']} lines" if info["full_lines"] else ""
+            parts.append(f"(book_so_far.txt has {info['lines']} lines{full}; contents.txt lists "
                          f"{info['chapters']} chapters; history.md has {info['history']} earlier exchanges.)")
         page = (req.get("page_text") or "").strip()
         if page and not selection:
@@ -681,19 +705,29 @@ def build_prompt(req, info, new_session, question):
     return "\n\n".join(parts)
 
 
+def saw_whole_book(book_id, session_id):
+    """Whether a conversation was had while the book was marked "Spoilers OK"."""
+    return any(e.get("session_id") == session_id and e.get("spoilers_ok")
+               for e in read_history(book_id))
+
+
 def handle_ask():
     """Request: {book_id, title, authors, chapter, percent, page_text, toc,
-    selection, action, question, session_id}. Reply: {ok, answer, session_id, actions}."""
+    selection, action, question, session_id, spoilers_ok}.
+    Reply: {ok, answer, session_id, actions}."""
     req = read_json_stdin()
     book_id = check_id(req.get("book_id"))
+    spoilers_ok = req.get("spoilers_ok") is True
     session_id = req.get("session_id")
     if session_id and not re.fullmatch(r"[0-9a-fA-F-]{36}", str(session_id)):
         session_id = None
+    if session_id and not spoilers_ok and saw_whole_book(book_id, session_id):
+        session_id = None  # that conversation may already hold spoilers
 
     mods = load_modules()
-    sys_prompt = system_prompt(mods)
+    sys_prompt = system_prompt(mods, spoilers_ok)
     question = resolve_question(req, mods)
-    workdir, info = prepare_workdir(book_id, req)
+    workdir, info = prepare_workdir(book_id, req, spoilers_ok)
     started = time.time()
     try:
         res = run_claude(build_prompt(req, info, not session_id, question), workdir, sys_prompt, session_id)
@@ -718,6 +752,7 @@ def handle_ask():
         "question": (req.get("question") or "").strip() or label or question,
         "selection": (req.get("selection") or "").strip()[:1000] or None,
         "answer": answer,
+        "spoilers_ok": spoilers_ok,
     })
     log(f"ask {book_id} session={out.get('session_id')} turns={out.get('num_turns')} "
         f"{time.time() - started:.1f}s action={req.get('action')} q={question[:60]!r}")

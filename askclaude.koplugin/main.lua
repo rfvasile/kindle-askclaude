@@ -328,6 +328,27 @@ function AskClaude:saveSession(book_id, session_id)
     self:set("sessions", sessions)
 end
 
+-- "Spoilers OK": Claude gets the whole book, and the no-spoilers rule is off.
+function AskClaude:spoilersOk(book_id)
+    local books = self.settings:readSetting("spoilers_ok") or {}
+    return books[book_id or self:bookId()] == true
+end
+
+function AskClaude:toggleSpoilersOk()
+    local book_id = self:bookId()
+    local on = not self:spoilersOk(book_id)
+    local books = self.settings:readSetting("spoilers_ok") or {}
+    books[book_id] = on or nil
+    self:set("spoilers_ok", books)
+    -- The current conversation was had under the other setting.
+    self:saveSession(book_id, nil)
+    UIManager:show(InfoMessage:new{
+        text = on and _("Spoilers OK: Claude can now read the whole book and discuss anything in it. The next question starts a new conversation.")
+            or _("No spoilers again. The next question starts a new conversation."),
+        timeout = 4,
+    })
+end
+
 -- UI --------------------------------------------------------------------------
 --
 -- Navigation: every screen opened from another screen gets a `back` function
@@ -382,7 +403,9 @@ function AskClaude:showMenu(selection)
         { text = _("Modules"), callback = go(function() self:showModules(selection, back) end) },
     })
     menu = ButtonDialog:new{
-        title = selection and ("“" .. excerpt(selection, 180) .. "”") or _("Ask Claude about this book"),
+        title = selection and ("“" .. excerpt(selection, 180) .. "”")
+            or (self:spoilersOk() and _("Ask Claude about this book (spoilers OK)"))
+            or _("Ask Claude about this book"),
         title_align = "center",
         buttons = buttons,
     }
@@ -799,6 +822,7 @@ function AskClaude:doAsk(opts)
         action = opts.action,
         question = opts.question,
         session_id = opts.session_id,
+        spoilers_ok = self:spoilersOk(ctx.book_id),
     }
     local reqfile = self:writeRequest("request", req)
     if not reqfile then return self:showError(_("Couldn't write the request file.")) end
@@ -900,6 +924,11 @@ function AskClaude:addToMainMenu(menu_items)
                     self:set("sessions", sessions)
                     UIManager:show(InfoMessage:new{ text = _("The next question starts fresh."), timeout = 2 })
                 end,
+            },
+            {
+                text = _("Spoilers OK for this book"),
+                checked_func = function() return self:spoilersOk() end,
+                callback = function() self:toggleSpoilersOk() end,
             },
             {
                 text = _("Refresh menu from computer"),

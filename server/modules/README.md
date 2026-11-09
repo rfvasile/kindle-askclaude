@@ -8,6 +8,7 @@ label: Who is this?      # button text on the Kindle (only used if there is a pr
 scope: selection         # selection | page | any  (when the button is shown)
 order: 22                # sorts both the menu and the guidance in the system prompt
 enabled: true            # false = unplugged
+skip_if_spoilers_ok: false  # true = left out for books marked "Spoilers OK"
 ---
 ## guidance
 Rules added to Claude's system prompt for every question.
