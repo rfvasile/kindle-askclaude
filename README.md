@@ -1,0 +1,26 @@
+# Ask Claude for KOReader
+
+Ask Claude Code on your computer about the book you're reading in KOReader. Claude only sees the text up to your current page, so there are no spoilers. What Claude does is configured by the modules in [`server/modules/`](server/modules/).
+
+<p align="center">
+  <img src="docs/whos-who.png" width="360" alt="A “Who's who” answer from Ask Claude in KOReader">
+</p>
+
+## Requirements
+
+- Claude Code on the computer, and calibre for EPUB/MOBI books
+- KOReader on a Kindle, with `ssh kindle` working
+- A Kindle key pair: private key at `koreader/settings/SSH/id_laptop`, public key on the computer at `~/.ssh/kindle_to_laptop.pub`
+
+Both are covered in [docs/setup.md](docs/setup.md).
+
+## Setup
+
+```sh
+git clone https://github.com/rfvasile/kindle-askclaude.git
+cd kindle-askclaude
+SUBNET=192.168.1.0/24 bash setup-laptop.sh   # your home network
+bash install-kindle.sh
+```
+
+Then restart KOReader, select some text and tap **Ask Claude…**. More in [docs/usage.md](docs/usage.md).
