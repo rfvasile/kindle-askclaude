@@ -1,9 +1,11 @@
 # Ask Claude for KOReader
 
-Ask Claude Code on your computer about the book you're reading in KOReader. By default, Claude only sees the text up to your current page, so there are no spoilers. What Claude does is configured by the modules in [`server/modules/`](server/modules/).
+Ask Claude Code on your computer about the book you're reading in KOReader. By default, Claude only sees the text up to your current page. What Claude does is configured by the modules in [`server/modules/`](server/modules/).
 
 <p align="center">
   <img src="docs/whos-who.png" width="360" alt="A “Who's who” answer from Ask Claude in KOReader">
+  <br>
+  <sub>A repeat “Who's who” early in Chapter 1 of <i>The Picture of Dorian Gray</i>.</sub>
 </p>
 
 ## Requirements
