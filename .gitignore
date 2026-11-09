@@ -1,0 +1,4 @@
+__pycache__/
+# Written at runtime by kindle_ask.py
+server/modules/drafts/
+server/modules/trash/
