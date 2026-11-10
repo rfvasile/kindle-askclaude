@@ -1,5 +1,7 @@
 # Usage
 
+Everything here happens in KOReader on the Kindle; the computer only answers in the background.
+
 Open the Ask Claude menu:
 - **On a passage:** select text and tap **Ask Claude…**
 - **On the current page:** Tools → Ask Claude → Open Ask Claude menu, or assign *Ask Claude* (Reader section) to a gesture in Settings → Taps and gestures → Gesture manager
