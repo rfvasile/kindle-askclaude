@@ -3,7 +3,7 @@
 Ask Claude about the book you're reading in KOReader. You ask and read the answers on the Kindle; the computer only runs Claude Code to send answers back, and is where you tune what Claude does through the modules in [`server/modules/`](server/modules/). By default, Claude only sees the text up to your current page.
 
 > [!NOTE]
-> This extension is vibe-coded. I mainly use it myself, as a teaching assistant for the books I read in KOReader on my Kindle.
+> This extension is vibe-coded. I mainly use it myself, as an assistant for the books I read on my Kindle.
 
 <p align="center">
   <img src="docs/whos-who.png" width="360" alt="A “Who's who” answer from Ask Claude in KOReader on the Kindle">
@@ -24,7 +24,7 @@ Both are covered in [docs/setup.md](docs/setup.md).
 ```sh
 git clone https://github.com/rfvasile/kindle-askclaude.git
 cd kindle-askclaude
-SUBNET=192.168.1.0/24 bash setup-laptop.sh   # your home network
+SUBNET=192.168.1.0/24 bash setup-laptop.sh
 bash install-kindle.sh
 ```
 
