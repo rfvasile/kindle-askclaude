@@ -2,6 +2,9 @@
 
 Ask Claude about the book you're reading in KOReader. You ask and read the answers on the Kindle; the computer only runs Claude Code to send answers back, and is where you tune what Claude does through the modules in [`server/modules/`](server/modules/). By default, Claude only sees the text up to your current page.
 
+> [!NOTE]
+> This extension is vibe-coded. I mainly use it myself, as a teaching assistant for the books I read in KOReader on my Kindle.
+
 <p align="center">
   <img src="docs/whos-who.png" width="360" alt="A “Who's who” answer from Ask Claude in KOReader on the Kindle">
   <br>
